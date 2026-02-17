@@ -32,10 +32,7 @@ def unnest_event(
         ```
     """
 
-    print(decoded_log_df.columns)
-    print("Decoded log df before:", decoded_log_df.sort(decoded_log_df.columns).head())
     decoded_log_df = to_polars(decoded_log_df)
-    print("Decoded log df:", decoded_log_df.sort(decoded_log_df.columns).head())
 
     filtered_df = decoded_log_df
     if event_name is not None:
