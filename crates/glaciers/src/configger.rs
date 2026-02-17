@@ -1,5 +1,5 @@
 //! Module for configuration management for the Glaciers.
-//! 
+//!
 //! The configger has 3 main components:
 //!  - It defines the structs for all the configuration fields.
 //!  - It provides the static GLACIERS_CONFIG, which is the default configuration for Glaciers.
@@ -8,6 +8,7 @@
 use std::sync::{LazyLock, RwLock};
 use std::fs;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "python")]
 use pyo3::FromPyObject;
 use thiserror::Error;
 
@@ -197,14 +198,14 @@ pub enum DataType {
     HexString
 }
 
-/// Static configuration for the Glaciers component 
-/// 
+/// Static configuration for the Glaciers component
+///
 /// This is the default configuration for Glaciers.
-/// 
+///
 /// It is a lazy lock to ensure that the configuration is thread safe.
-/// 
+///
 /// It is initialized with the default values for all the configuration fields.
-/// 
+///
 pub static GLACIERS_CONFIG: LazyLock<RwLock<Config>> = LazyLock::new(|| {
     RwLock::new(Config {
         glaciers: GlaciersConfig {
@@ -271,7 +272,8 @@ pub static GLACIERS_CONFIG: LazyLock<RwLock<Config>> = LazyLock::new(|| {
 });
 
 /// Enum for the different types of values that can be received by the set_config function
-#[derive(Clone, FromPyObject, Debug)]
+#[cfg_attr(feature = "python", derive(FromPyObject))]
+#[derive(Clone, Debug)]
 pub enum ConfigValue {
     String(String),
     Number(usize),
@@ -280,9 +282,9 @@ pub enum ConfigValue {
 }
 
 /// Impl for the From trait for the ConfigValue enum
-/// 
+///
 /// Converts a &str to a ConfigValue::String
-/// 
+///
 /// # Arguments
 /// * `s` - The string to convert to a ConfigValue::String
 impl From<&str> for ConfigValue {
@@ -292,9 +294,9 @@ impl From<&str> for ConfigValue {
 }
 
 /// Impl for the From trait for the ConfigValue enum
-/// 
+///
 /// Converts a usize to a ConfigValue::Number
-/// 
+///
 /// # Arguments
 /// * `n` - The usize to convert to a ConfigValue::Number
 impl From<usize> for ConfigValue {
@@ -304,9 +306,9 @@ impl From<usize> for ConfigValue {
 }
 
 /// Impl for the From trait for the ConfigValue enum
-/// 
+///
 /// Converts a `Vec<String>` to a ConfigValue::List
-/// 
+///
 /// # Arguments
 /// * `v` - The `Vec<String>` to convert to a ConfigValue::List
 impl From<Vec<String>> for ConfigValue {
@@ -316,9 +318,9 @@ impl From<Vec<String>> for ConfigValue {
 }
 
 /// Impl for the From trait for the ConfigValue enum
-/// 
+///
 /// Converts a bool to a ConfigValue::Boolean
-/// 
+///
 /// # Arguments
 /// * `b` - The bool to convert to a ConfigValue::Boolean
 impl From<bool> for ConfigValue {
@@ -328,7 +330,7 @@ impl From<bool> for ConfigValue {
 }
 
 /// Get the current configuration of glaciers
-/// 
+///
 /// # Returns
 /// * `Config` - A struct with all the current configurations (like a dictionary)
 /// # Example
@@ -340,17 +342,17 @@ pub fn get_config() -> Config {
 }
 
 /// Set a configuration for one item in the configuration.
-/// 
+///
 /// # Arguments
 /// * `config_path` - The path to the configuration field to set. i.e: "glaciers.preferred_dataframe_type"
 /// * `value` - The value to set the configuration field to. i.e: "polars" or "pandas"
-/// 
+///
 /// # Notes
 /// * Some items can receive different types of values (i.e: output_hex_string_encoding can be False/True, 1/0)
 /// * It also does some light transformations to the value, like converting the string to lowercase, for less error prone code.
 pub fn set_config(config_path: &str, value: impl Into<ConfigValue>) -> Result<(), ConfiggerError> {
     let mut config = GLACIERS_CONFIG.write().unwrap();
-    
+
     // Breaks the config_path into sections, fields and subfields.
     let value = value.into();
     let section = config_path.split(".").nth(0).ok_or(ConfiggerError::InvalidFieldOrValue(format!("Section missing in field: {}", config_path.to_string())))?;
@@ -358,7 +360,7 @@ pub fn set_config(config_path: &str, value: impl Into<ConfigValue>) -> Result<()
     let subfield = config_path.split(".").nth(2);
     let schema_field = config_path.split(".").nth(3);
 
-    // Matches each component of the path to a item in the configuration, and then it sets the value of the corresponding item. 
+    // Matches each component of the path to a item in the configuration, and then it sets the value of the corresponding item.
     // Some items can receive different types of values (i.e: output_hex_string_encoding can be False/True, 1/0)
     // It also does some light transformations to the value, like converting the string to lowercase, for less error prone code.
     match section {
@@ -418,7 +420,7 @@ pub fn set_config(config_path: &str, value: impl Into<ConfigValue>) -> Result<()
             },
             _ => return Err(ConfiggerError::InvalidFieldOrValue(field.unwrap_or("").to_string()))
         },
-        
+
         "decoder" => match (field, value) {
             (Some("algorithm"), ConfigValue::String(v)) => {
                 match v.to_lowercase().as_str() {
@@ -445,7 +447,7 @@ pub fn set_config(config_path: &str, value: impl Into<ConfigValue>) -> Result<()
             (Some("decoded_chunk_size"), ConfigValue::Number(v)) => config.decoder.decoded_chunk_size = v,
             _ => return Err(ConfiggerError::InvalidFieldOrValue(field.unwrap_or("").to_string()))
         },
-        
+
         "log_decoder" => match (field, value) {
             (Some("log_schema"), value) => match (subfield, value) {
                 (Some("log_alias"), ConfigValue::String(v)) => {
@@ -498,7 +500,7 @@ pub fn set_config(config_path: &str, value: impl Into<ConfigValue>) -> Result<()
             },
             _ => return Err(ConfiggerError::InvalidFieldOrValue(field.unwrap_or("").to_string()))
         },
-        
+
         "trace_decoder" => match (field, value) {
             (Some("trace_schema"), value) => match (subfield, value) {
                 (Some("trace_alias"), ConfigValue::String(v)) => {
@@ -546,7 +548,7 @@ pub fn set_config(config_path: &str, value: impl Into<ConfigValue>) -> Result<()
 }
 
 /// Loads and processes a TOML configuration file, calling set_config for each item in the file.
-/// 
+///
 /// # Arguments
 /// * `file_path` - The path to the TOML configuration file
 pub fn set_config_toml(file_path: &str) -> Result<(), ConfiggerError> {
@@ -555,11 +557,11 @@ pub fn set_config_toml(file_path: &str) -> Result<(), ConfiggerError> {
         .map_err(ConfiggerError::IOError)
         .and_then(|content| toml::from_str(&content)
         .map_err(ConfiggerError::ParseError))?;
-    
+
     // Extract root table or return error if invalid format
     let table = config.as_table()
         .ok_or(ConfiggerError::InvalidTomlFormat)?;
-    
+
     // Process table and set each config key-value pair
     let config_pairs = process_table("", table)?;
     for (key, value) in config_pairs {
@@ -569,13 +571,13 @@ pub fn set_config_toml(file_path: &str) -> Result<(), ConfiggerError> {
  }
 
  /// Processes nested tables of a TOML file, returning a vector of key-value pairs.
- /// 
+ ///
  /// # Arguments
  /// * `prefix` - The prefix to add to the key
  /// * `table` - The table to process
  fn process_table(prefix: &str, table: &toml::Table) -> Result<Vec<(String, ConfigValue)>, ConfiggerError> {
     let mut config_pairs = Vec::new();
-    
+
     for (key, value) in table {
         // Build full key path with prefix for nested tables
         let full_key = if prefix.is_empty() {
@@ -583,14 +585,14 @@ pub fn set_config_toml(file_path: &str) -> Result<(), ConfiggerError> {
         } else {
             format!("{}.{}", prefix, key)
         };
-        
+
          // if the value is a table, process it recursively without adding it to the config_pairs, otherwise add it to the config_pairs
         match value {
             toml::Value::Table(nested) => config_pairs.extend(process_table(&full_key, nested)?),
-            
+
             // Handle string values, checking for hex prefix
             toml::Value::String(s) => config_pairs.push((full_key, ConfigValue::String(s.clone()))),
-            // Convert integer to usize 
+            // Convert integer to usize
             toml::Value::Integer(n) => config_pairs.push((full_key, ConfigValue::Number(*n as usize))),
             // Convert array to Vec<String>, ensuring all elements are strings
             toml::Value::Array(arr) => {
@@ -608,14 +610,14 @@ pub fn set_config_toml(file_path: &str) -> Result<(), ConfiggerError> {
             _ => return Err(ConfiggerError::UnsupportedValueType(full_key)),
         }
     }
-    
+
     Ok(config_pairs)
  }
 
  //Validations:
 
  /// Validates the unique_key field.
- /// 
+ ///
  /// # Arguments
  /// * `unique_key` - The unique_key to validate
  fn validate_unique_key(unique_key: &Vec<String>) -> Result<(), ConfiggerError> {
@@ -629,7 +631,7 @@ pub fn set_config_toml(file_path: &str) -> Result<(), ConfiggerError> {
  }
 
  /// Validates the output_file_format field.
- /// 
+ ///
  /// # Arguments
  /// * `output_file_format` - The output_file_format to validate
  fn validate_output_file_format(output_file_format: &String) -> Result<(), ConfiggerError> {
