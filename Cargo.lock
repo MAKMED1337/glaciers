@@ -2191,7 +2191,7 @@ dependencies = [
 
 [[package]]
 name = "glaciers"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "alloy",
  "chrono",
@@ -2208,7 +2208,7 @@ dependencies = [
 
 [[package]]
 name = "glaciers_cli"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "alloy",
  "chrono",
@@ -2224,7 +2224,7 @@ dependencies = [
 
 [[package]]
 name = "glaciers_python"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "alloy",
  "glaciers",

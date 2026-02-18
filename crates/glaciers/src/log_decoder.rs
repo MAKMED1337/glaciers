@@ -9,6 +9,7 @@
 use alloy::dyn_abi::{DynSolValue, EventExt};
 use alloy::json_abi::{Event, EventParam};
 use alloy::primitives::FixedBytes;
+use chrono::Local;
 use polars::prelude::*;
 use thiserror::Error;
 
@@ -112,20 +113,35 @@ fn decode_log_udf(s: Column) -> PolarsResult<Column> {
     let topics_data_sig = extract_log_fields(&fields)?;
 
     //iterate through each row value, calling the decode function and mapping it to a 3 parts result string separated by ;
+    let mut decode_ok_count = 0usize;
+    let mut decode_err_count = 0usize;
     let udf_output: StringChunked = topics_data_sig
         .into_iter()
         .map(|(topics, data, sig)| {
-            decode(sig, topics, data)
-                .map(|event| {
-                    format!(
+            let result = decode(sig, topics, data);
+            match result {
+                Ok(event) => {
+                    decode_ok_count += 1;
+                    Some(format!(
                         "{:?}; {:?}; {}",
                         event.event_values, event.event_keys, event.event_json
-                    )
-                })
-                // Ignore decoding errors. In the future, we can have a param to log errors or store them in the table.
-                .ok()
+                    ))
+                }
+                Err(_e) => {
+                    decode_err_count += 1;
+                    None
+                }
+            }
         })
         .collect();
+    if decode_err_count > 0 {
+        println!(
+            "[{}] Log decoding finished with {} errors out of {} rows.",
+            Local::now().format("%Y-%m-%d %H:%M:%S"),
+            decode_err_count,
+            decode_ok_count + decode_err_count
+        );
+    }
 
     Ok(udf_output.into_column())
 }
@@ -161,12 +177,10 @@ fn extract_log_fields(fields: &[Series]) -> PolarsResult<Vec<(Vec<FixedBytes<32>
         .zip(fields_sig.into_iter())
         .map(
             |(((((opt_topic0, opt_topic1), opt_topic2), opt_topic3), opt_data), opt_sig)| {
-                let topics = vec![
-                    FixedBytes::from_slice(opt_topic0.unwrap_or(&zero_filled_topic)),
-                    FixedBytes::from_slice(opt_topic1.unwrap_or(&zero_filled_topic)),
-                    FixedBytes::from_slice(opt_topic2.unwrap_or(&zero_filled_topic)),
-                    FixedBytes::from_slice(opt_topic3.unwrap_or(&zero_filled_topic)),
-                ];
+                let mut topics = vec![FixedBytes::from_slice(opt_topic0.unwrap_or(&zero_filled_topic))];
+                if let Some(t) = opt_topic1 { topics.push(FixedBytes::from_slice(t)); }
+                if let Some(t) = opt_topic2 { topics.push(FixedBytes::from_slice(t)); }
+                if let Some(t) = opt_topic3 { topics.push(FixedBytes::from_slice(t)); }
                 let data = opt_data.unwrap_or(&[]);
                 let sig = opt_sig.unwrap_or("");
 
