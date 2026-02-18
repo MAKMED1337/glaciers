@@ -177,10 +177,18 @@ fn extract_log_fields(fields: &[Series]) -> PolarsResult<Vec<(Vec<FixedBytes<32>
         .zip(fields_sig.into_iter())
         .map(
             |(((((opt_topic0, opt_topic1), opt_topic2), opt_topic3), opt_data), opt_sig)| {
-                let mut topics = vec![FixedBytes::from_slice(opt_topic0.unwrap_or(&zero_filled_topic))];
-                if let Some(t) = opt_topic1 { topics.push(FixedBytes::from_slice(t)); }
-                if let Some(t) = opt_topic2 { topics.push(FixedBytes::from_slice(t)); }
-                if let Some(t) = opt_topic3 { topics.push(FixedBytes::from_slice(t)); }
+                let mut topics = vec![FixedBytes::from_slice(
+                    opt_topic0.unwrap_or(&zero_filled_topic),
+                )];
+                if let Some(t) = opt_topic1 {
+                    topics.push(FixedBytes::from_slice(t));
+                }
+                if let Some(t) = opt_topic2 {
+                    topics.push(FixedBytes::from_slice(t));
+                }
+                if let Some(t) = opt_topic3 {
+                    topics.push(FixedBytes::from_slice(t));
+                }
                 let data = opt_data.unwrap_or(&[]);
                 let sig = opt_sig.unwrap_or("");
 
